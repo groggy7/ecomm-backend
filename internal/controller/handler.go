@@ -8,10 +8,10 @@ import (
 )
 
 type ProductHandler struct {
-	usecase *usecases.ProductUsecase
+	usecase *usecases.UseCase
 }
 
-func NewProductHandler(usecase *usecases.ProductUsecase) *ProductHandler {
+func NewProductHandler(usecase *usecases.UseCase) *ProductHandler {
 	return &ProductHandler{
 		usecase: usecase,
 	}

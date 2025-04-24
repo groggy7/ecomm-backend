@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"ecomm/internal/controller"
-	"ecomm/internal/controller/router"
 	"ecomm/internal/repository"
 	"ecomm/internal/usecases"
 	"log"
@@ -28,11 +27,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	productRepo := repository.NewProductRepo(pool)
-	productUsecase := usecases.NewProductUsecase(productRepo)
+	productRepo := repository.NewRepository(pool)
+	productUsecase := usecases.NewUseCase(productRepo)
 	productHandler := controller.NewProductHandler(productUsecase)
 
-	router := router.NewRouter(productHandler)
+	router := controller.NewRouter(productHandler)
 	if err := router.Run(":8080"); err != nil {
 		panic(err)
 	}

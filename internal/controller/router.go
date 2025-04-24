@@ -1,12 +1,10 @@
-package router
+package controller
 
 import (
-	"ecomm/internal/controller"
-
 	"github.com/gin-gonic/gin"
 )
 
-func NewRouter(ph *controller.ProductHandler) *gin.Engine {
+func NewRouter(ph *ProductHandler) *gin.Engine {
 	engine := gin.Default()
 
 	engine.GET("/products", ph.GetAllProducts)
