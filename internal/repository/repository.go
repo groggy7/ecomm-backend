@@ -16,7 +16,7 @@ func NewRepository(pool *pgxpool.Pool) domain.Repository {
 	return &repository{pool: pool}
 }
 
-func (p *repository) CreateProduct(product *domain.Product) (*domain.Product, error) {
+func (r *repository) CreateProduct(product *domain.Product) (*domain.Product, error) {
 	query := `
         INSERT INTO 
         products(name, image, category, description, rating, num_reviews, price, count_in_stock)
@@ -24,7 +24,7 @@ func (p *repository) CreateProduct(product *domain.Product) (*domain.Product, er
 		RETURNING id
     `
 
-	err := p.pool.QueryRow(context.Background(), query,
+	err := r.pool.QueryRow(context.Background(), query,
 		&product.Name,
 		&product.Image,
 		&product.Category,
@@ -39,14 +39,14 @@ func (p *repository) CreateProduct(product *domain.Product) (*domain.Product, er
 	return product, nil
 }
 
-func (p *repository) GetProductByID(id string) (*domain.Product, error) {
+func (r *repository) GetProductByID(id string) (*domain.Product, error) {
 	query := `
 		SELECT id, name, image, category, description, rating, num_reviews, price, count_in_stock, created_at, updated_at
 		FROM products WHERE id = $1
 	`
 
 	product := new(domain.Product)
-	if err := p.pool.QueryRow(context.Background(), query, id).Scan(
+	if err := r.pool.QueryRow(context.Background(), query, id).Scan(
 		&product.ID,
 		&product.Name,
 		&product.Image,
@@ -64,14 +64,14 @@ func (p *repository) GetProductByID(id string) (*domain.Product, error) {
 	return product, nil
 }
 
-func (p *repository) ListProducts() ([]domain.Product, error) {
+func (r *repository) ListProducts() ([]domain.Product, error) {
 	query := `
 		SELECT id, name, image, category, description, rating, num_reviews, price, count_in_stock, created_at, updated_at
 		FROM products
 	`
 
 	products := make([]domain.Product, 0)
-	rows, err := p.pool.Query(context.Background(), query)
+	rows, err := r.pool.Query(context.Background(), query)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (p *repository) ListProducts() ([]domain.Product, error) {
 	return products, nil
 }
 
-func (p *repository) UpdateProduct(product *domain.Product) error {
+func (r *repository) UpdateProduct(product *domain.Product) error {
 	query := `
 		UPDATE products
 		SET name = $1, image = $2, category = $3, description = $4,
@@ -107,7 +107,7 @@ func (p *repository) UpdateProduct(product *domain.Product) error {
 		WHERE id = $9
 	`
 
-	if _, err := p.pool.Exec(context.Background(), query,
+	if _, err := r.pool.Exec(context.Background(), query,
 		&product.Name,
 		&product.Image,
 		&product.Category,
@@ -123,9 +123,9 @@ func (p *repository) UpdateProduct(product *domain.Product) error {
 	return nil
 }
 
-func (p *repository) DeleteProduct(id string) error {
+func (r *repository) DeleteProduct(id string) error {
 	query := `DELETE FROM products where id = $1`
-	result, err := p.pool.Exec(context.Background(), query, id)
+	result, err := r.pool.Exec(context.Background(), query, id)
 	if err != nil {
 		return err
 	}
@@ -137,8 +137,8 @@ func (p *repository) DeleteProduct(id string) error {
 	return nil
 }
 
-func (p *repository) CreateOrder(order *domain.Order) (*domain.Order, error) {
-	tx, err := p.pool.Begin(context.Background())
+func (r *repository) CreateOrder(order *domain.Order) (*domain.Order, error) {
+	tx, err := r.pool.Begin(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func (p *repository) CreateOrder(order *domain.Order) (*domain.Order, error) {
 
 	for _, orderItem := range order.OrderItems {
 		err := tx.QueryRow(context.Background(), query,
-			&orderItem.OrderID,
+			&order.ID,
 			&orderItem.ProductID,
 			&orderItem.Name,
 			&orderItem.Quantity,
@@ -186,14 +186,14 @@ func (p *repository) CreateOrder(order *domain.Order) (*domain.Order, error) {
 	return order, nil
 }
 
-func (p *repository) GetOrderByID(id string) (*domain.Order, error) {
+func (r *repository) GetOrderByID(id string) (*domain.Order, error) {
 	query := `
 		SELECT id, payment_method, tax_price, shipping_price, total_price, created_at, updated_at
 		FROM orders WHERE id = $1
 	`
 
 	order := new(domain.Order)
-	if err := p.pool.QueryRow(context.Background(), query, id).Scan(
+	if err := r.pool.QueryRow(context.Background(), query, id).Scan(
 		&order.ID,
 		&order.PaymentMethod,
 		&order.TaxPrice,
@@ -207,14 +207,14 @@ func (p *repository) GetOrderByID(id string) (*domain.Order, error) {
 	return order, nil
 }
 
-func (p *repository) ListOrders() ([]domain.Order, error) {
+func (r *repository) ListOrders() ([]domain.Order, error) {
 	query := `
 		SELECT id, payment_method, tax_price, shipping_price, total_price, created_at, updated_at
 		FROM orders
 	`
 
 	var orders []domain.Order
-	if err := pgxscan.Select(context.Background(), p.pool, &orders, query); err != nil {
+	if err := pgxscan.Select(context.Background(), r.pool, &orders, query); err != nil {
 		return nil, err
 	}
 
@@ -225,7 +225,7 @@ func (p *repository) ListOrders() ([]domain.Order, error) {
 		`
 
 		var orderItems []domain.OrderItem
-		if err := pgxscan.Select(context.Background(), p.pool, &orderItems, query, orders[i].ID); err != nil {
+		if err := pgxscan.Select(context.Background(), r.pool, &orderItems, query, orders[i].ID); err != nil {
 			return nil, err
 		}
 
@@ -235,22 +235,27 @@ func (p *repository) ListOrders() ([]domain.Order, error) {
 	return orders, nil
 }
 
-func (p *repository) DeleteOrder(id string) error {
-	tx, err := p.pool.Begin(context.Background())
+func (r *repository) DeleteOrder(id string) error {
+	tx, err := r.pool.Begin(context.Background())
 	if err != nil {
 		return err
 	}
 
 	defer tx.Rollback(context.Background())
 
-	query := `DELETE FROM orders where id = $1`
+	query := `DELETE FROM order_items where order_id = $1`
 	if _, err := tx.Exec(context.Background(), query, id); err != nil {
 		return err
 	}
 
-	query = `DELETE FROM order_items where order_id = $1`
-	if _, err := tx.Exec(context.Background(), query, id); err != nil {
+	query = `DELETE FROM orders where id = $1`
+	result, err := tx.Exec(context.Background(), query, id)
+	if err != nil {
 		return err
+	}
+
+	if result.RowsAffected() == 0 {
+		return domain.ErrOrderNotFound
 	}
 
 	if err := tx.Commit(context.Background()); err != nil {
@@ -258,4 +263,18 @@ func (p *repository) DeleteOrder(id string) error {
 	}
 
 	return nil
+}
+
+func (r *repository) GetOrderItems(orderID string) ([]domain.OrderItem, error) {
+	query := `
+		SELECT id, order_id, product_id, name, quantity, image, price
+		FROM order_items WHERE order_id = $1
+	`
+
+	var orderItems []domain.OrderItem
+	if err := pgxscan.Select(context.Background(), r.pool, &orderItems, query, orderID); err != nil {
+		return nil, err
+	}
+
+	return orderItems, nil
 }

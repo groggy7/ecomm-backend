@@ -72,6 +72,13 @@ func (u *UseCase) DeleteProduct(id string) error {
 }
 
 func (u *UseCase) CreateOrder(req *domain.CreateOrderRequest) (*domain.Order, error) {
+	for _, item := range req.OrderItems {
+		_, err := u.repo.GetProductByID(item.ProductID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	order := &domain.Order{
 		PaymentMethod: req.PaymentMethod,
 		TaxPrice:      req.TaxPrice,
@@ -84,11 +91,31 @@ func (u *UseCase) CreateOrder(req *domain.CreateOrderRequest) (*domain.Order, er
 }
 
 func (u *UseCase) GetOrderByID(id string) (*domain.Order, error) {
-	return u.repo.GetOrderByID(id)
+	order, err := u.repo.GetOrderByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	orderItems, err := u.repo.GetOrderItems(id)
+	if err != nil {
+		return nil, err
+	}
+
+	order.OrderItems = orderItems
+	return order, nil
 }
 
 func (u *UseCase) GetAllOrders() ([]domain.Order, error) {
-	return u.repo.ListOrders()
+	orders, err := u.repo.ListOrders()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(orders) == 0 {
+		return []domain.Order{}, nil
+	}
+
+	return orders, nil
 }
 
 func (u *UseCase) DeleteOrder(id string) error {

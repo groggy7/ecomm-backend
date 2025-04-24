@@ -28,11 +28,11 @@ type Order struct {
 type OrderItem struct {
 	ID        string  `json:"id"`
 	OrderID   string  `json:"order_id"`
-	ProductID string  `json:"product_id"`
-	Name      string  `json:"name"`
-	Quantity  int     `json:"quantity"`
-	Image     string  `json:"image"`
-	Price     float64 `json:"price"`
+	ProductID string  `json:"product_id" binding:"required"`
+	Name      string  `json:"name"  binding:"required"`
+	Quantity  int     `json:"quantity" binding:"required"`
+	Image     string  `json:"image" binding:"required"`
+	Price     float64 `json:"price" binding:"required"`
 }
 
 type CreateProductRequest struct {
