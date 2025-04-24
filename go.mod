@@ -3,6 +3,7 @@ module ecomm
 go 1.24.2
 
 require (
+	github.com/georgysavva/scany/v2 v2.1.4
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/jackc/pgx/v5 v5.7.4

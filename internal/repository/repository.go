@@ -4,6 +4,7 @@ import (
 	"context"
 	"ecomm/internal/domain"
 
+	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -124,8 +125,13 @@ func (p *repository) UpdateProduct(product *domain.Product) error {
 
 func (p *repository) DeleteProduct(id string) error {
 	query := `DELETE FROM products where id = $1`
-	if _, err := p.pool.Exec(context.Background(), query, id); err != nil {
+	result, err := p.pool.Exec(context.Background(), query, id)
+	if err != nil {
 		return err
+	}
+
+	if result.RowsAffected() == 0 {
+		return domain.ErrProductNotFound
 	}
 
 	return nil
@@ -207,26 +213,9 @@ func (p *repository) ListOrders() ([]domain.Order, error) {
 		FROM orders
 	`
 
-	orders := make([]domain.Order, 0)
-	rows, err := p.pool.Query(context.Background(), query)
-	if err != nil {
+	var orders []domain.Order
+	if err := pgxscan.Select(context.Background(), p.pool, &orders, query); err != nil {
 		return nil, err
-	}
-
-	for rows.Next() {
-		order := new(domain.Order)
-		err := rows.Scan(
-			&order.ID,
-			&order.PaymentMethod,
-			&order.TaxPrice,
-			&order.ShippingPrice,
-			&order.TotalPrice,
-			&order.CreatedAt,
-			&order.UpdatedAt)
-		if err != nil {
-			return nil, err
-		}
-		orders = append(orders, *order)
 	}
 
 	for i := range orders {
@@ -235,26 +224,9 @@ func (p *repository) ListOrders() ([]domain.Order, error) {
 			FROM order_items WHERE order_id = $1
 		`
 
-		orderItems := make([]domain.OrderItem, 0)
-		rows, err := p.pool.Query(context.Background(), query, orders[i].ID)
-		if err != nil {
+		var orderItems []domain.OrderItem
+		if err := pgxscan.Select(context.Background(), p.pool, &orderItems, query, orders[i].ID); err != nil {
 			return nil, err
-		}
-
-		for rows.Next() {
-			orderItem := new(domain.OrderItem)
-			err := rows.Scan(
-				&orderItem.ID,
-				&orderItem.OrderID,
-				&orderItem.ProductID,
-				&orderItem.Name,
-				&orderItem.Quantity,
-				&orderItem.Image,
-				&orderItem.Price)
-			if err != nil {
-				return nil, err
-			}
-			orderItems = append(orderItems, *orderItem)
 		}
 
 		orders[i].OrderItems = orderItems
