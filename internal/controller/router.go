@@ -18,5 +18,14 @@ func NewRouter(ph *ProductHandler) *gin.Engine {
 	engine.GET("/orders/:id", ph.GetOrderByID)
 	engine.DELETE("/orders/:id", ph.DeleteOrder)
 
+	engine.POST("/users", ph.CreateUser)
+	engine.GET("/users", ph.ListUsers)
+	engine.PUT("/users", ph.UpdateUser)
+	engine.DELETE("/users/:id", ph.DeleteUser)
+
+	engine.POST("/login", ph.Login)
+	engine.POST("/logout", ph.Logout)
+	engine.POST("/sessions/refresh", ph.RefreshAccessToken)
+	engine.POST("/sessions/revoke/:id", ph.RevokeSession)
 	return engine
 }

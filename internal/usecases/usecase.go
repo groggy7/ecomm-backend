@@ -1,13 +1,29 @@
 package usecases
 
-import "ecomm/internal/domain"
+import (
+	"ecomm/internal/controller/auth"
+	"ecomm/internal/domain"
+	"fmt"
+	"log"
+	"time"
+
+	"golang.org/x/crypto/bcrypt"
+)
 
 type UseCase struct {
-	repo domain.Repository
+	repo       domain.Repository
+	jwtManager *auth.JWTManager
 }
 
 func NewUseCase(repo domain.Repository) *UseCase {
-	return &UseCase{repo: repo}
+	jwtManager, err := auth.NewTokenGenerator()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return &UseCase{
+		repo:       repo,
+		jwtManager: jwtManager,
+	}
 }
 
 func (u *UseCase) CreateProduct(req *domain.CreateProductRequest) (*domain.Product, error) {
@@ -120,4 +136,185 @@ func (u *UseCase) GetAllOrders() ([]domain.Order, error) {
 
 func (u *UseCase) DeleteOrder(id string) error {
 	return u.repo.DeleteOrder(id)
+}
+
+func (u *UseCase) CreateUser(req *domain.CreateUserRequest) (*domain.CreateUserResponse, error) {
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+
+	user := &domain.User{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: string(hashed),
+		IsAdmin:  req.IsAdmin,
+	}
+
+	createdUser, err := u.repo.CreateUser(user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.CreateUserResponse{
+		ID:      createdUser.ID,
+		Name:    createdUser.Name,
+		Email:   createdUser.Email,
+		IsAdmin: createdUser.IsAdmin,
+	}, nil
+}
+
+func (u *UseCase) GetUser(email string) (*domain.User, error) {
+	return u.repo.GetUser(email)
+}
+
+func (u *UseCase) ListUsers() (*domain.ListUserResponse, error) {
+	users, err := u.repo.ListUsers()
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &domain.ListUserResponse{
+		Users: make([]domain.UserInfo, len(users)),
+	}
+
+	for i, user := range users {
+		resp.Users[i] = domain.UserInfo{
+			ID:      user.ID,
+			Name:    user.Name,
+			Email:   user.Email,
+			IsAdmin: user.IsAdmin,
+		}
+	}
+
+	return resp, nil
+}
+
+func (u *UseCase) UpdateUser(req *domain.UpdateUserRequest) error {
+	user, err := u.repo.GetUser(req.Email)
+	if err != nil {
+		return err
+	}
+
+	if req.Name != "" {
+		user.Name = req.Name
+	}
+	if req.Email != "" {
+		user.Email = req.Email
+	}
+	if req.Password != "" {
+		user.Password = req.Password
+	}
+	if req.IsAdmin != user.IsAdmin {
+		user.IsAdmin = req.IsAdmin
+	}
+
+	user.UpdatedAt = uint64(time.Now().Unix())
+	return u.repo.UpdateUser(user)
+}
+
+func (u *UseCase) DeleteUser(id string) error {
+	return u.repo.DeleteUser(id)
+}
+
+func (u *UseCase) Login(req *domain.LoginRequest) (*domain.LoginResponse, error) {
+	user, err := u.repo.GetUser(req.Email)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		return nil, err
+	}
+
+	accessToken, accessClaims, err := u.jwtManager.GenerateToken(user.Email, user.ID, user.IsAdmin, time.Now().Add(3*time.Hour))
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, refreshClaims, err := u.jwtManager.GenerateToken(user.Email, user.ID, user.IsAdmin, time.Now().Add(3*24*time.Hour))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := u.repo.CreateSession(&domain.Session{
+		ID:           refreshClaims.RegisteredClaims.ID,
+		Email:        user.Email,
+		RefreshToken: refreshToken,
+		IsRevoked:    false,
+		ExpiresAt:    uint64(refreshClaims.RegisteredClaims.ExpiresAt.Unix()),
+	}); err != nil {
+		return nil, err
+	}
+
+	return &domain.LoginResponse{
+		SessionID:             refreshClaims.RegisteredClaims.ID,
+		AccessToken:           accessToken,
+		RefreshToken:          refreshToken,
+		AccessTokenExpiresAt:  uint64(accessClaims.RegisteredClaims.ExpiresAt.Unix()),
+		RefreshTokenExpiresAt: uint64(refreshClaims.RegisteredClaims.ExpiresAt.Unix()),
+	}, nil
+}
+
+func (u *UseCase) Logout(req *domain.LogoutRequest) error {
+	session, err := u.repo.GetSession(req.SessionID)
+	if err != nil {
+		return err
+	}
+
+	if session.IsRevoked {
+		return fmt.Errorf("invalid session")
+	}
+
+	if session.Email != req.Email {
+		return fmt.Errorf("invalid session")
+	}
+
+	if err := u.repo.RevokeSession(req.SessionID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (u *UseCase) RefreshToken(req *domain.RefreshAccessTokenRequest) (*domain.RefreshAccessTokenResponse, error) {
+	session, err := u.repo.GetSession(req.SessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	if session.ExpiresAt > uint64(time.Now().Unix()) {
+		if err := u.repo.RevokeSession(req.SessionID); err != nil {
+			return nil, err
+		}
+
+		return nil, fmt.Errorf("session expired")
+	}
+
+	if session.IsRevoked {
+		return nil, fmt.Errorf("session revoked")
+	}
+
+	if session.RefreshToken != req.RefreshToken {
+		return nil, fmt.Errorf("invalid session")
+	}
+
+	user, err := u.repo.GetUser(session.Email)
+	if err != nil {
+		return nil, err
+	}
+
+	token, claims, err := u.jwtManager.GenerateToken(user.Email, user.ID, user.IsAdmin, time.Now().Add(3*time.Hour))
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.RefreshAccessTokenResponse{
+		AccessToken:          token,
+		AccessTokenExpiresAt: uint64(claims.RegisteredClaims.ExpiresAt.Unix()),
+	}, nil
+}
+
+func (u *UseCase) RevokeSession(id string) error {
+	return u.repo.RevokeSession(id)
 }

@@ -278,3 +278,152 @@ func (r *repository) GetOrderItems(orderID string) ([]domain.OrderItem, error) {
 
 	return orderItems, nil
 }
+
+func (r *repository) CreateUser(user *domain.User) (*domain.User, error) {
+	query := `
+		INSERT INTO users(name, email, password, is_admin)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id
+	`
+
+	if err := r.pool.QueryRow(context.Background(), query,
+		&user.Name,
+		&user.Email,
+		&user.Password,
+		&user.IsAdmin).Scan(&user.ID); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (r *repository) GetUser(email string) (*domain.User, error) {
+	query := `
+		SELECT id, name, email, password, is_admin, created_at, updated_at
+		FROM users WHERE email = $1
+	`
+
+	user := new(domain.User)
+	if err := r.pool.QueryRow(context.Background(), query, email).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.Password,
+		&user.IsAdmin,
+		&user.CreatedAt,
+		&user.UpdatedAt); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (r *repository) ListUsers() ([]domain.User, error) {
+	query := `
+		SELECT id, name, email, is_admin, created_at, updated_at
+		FROM users
+	`
+
+	var users []domain.User
+	if err := pgxscan.Select(context.Background(), r.pool, &users, query); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
+func (r *repository) UpdateUser(user *domain.User) error {
+	query := `
+		UPDATE users SET name = $1, email = $2, password = $3, is_admin = $4
+		WHERE id = $5
+	`
+
+	if _, err := r.pool.Exec(context.Background(), query,
+		&user.Name,
+		&user.Email,
+		&user.Password,
+		&user.IsAdmin,
+		&user.ID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *repository) DeleteUser(id string) error {
+	query := `DELETE FROM users where id = $1`
+	result, err := r.pool.Exec(context.Background(), query, id)
+	if err != nil {
+		return err
+	}
+
+	if result.RowsAffected() == 0 {
+		return domain.ErrUserNotFound
+	}
+
+	return nil
+}
+
+func (r *repository) CreateSession(session *domain.Session) error {
+	query := `
+		INSERT INTO sessions(id, email, refresh_token, is_revoked)
+		VALUES ($1, $2, $3, $4)
+	`
+
+	if _, err := r.pool.Exec(context.Background(), query,
+		&session.ID,
+		&session.Email,
+		&session.RefreshToken,
+		&session.IsRevoked); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *repository) GetSession(id string) (*domain.Session, error) {
+	query := `
+		SELECT id, email, refresh_token, is_revoked, created_at, expires_at
+		FROM sessions WHERE id = $1
+	`
+
+	session := new(domain.Session)
+	if err := r.pool.QueryRow(context.Background(), query, id).Scan(
+		&session.ID,
+		&session.Email,
+		&session.RefreshToken,
+		&session.IsRevoked,
+		&session.CreatedAt,
+		&session.ExpiresAt); err != nil {
+		return nil, err
+	}
+
+	return session, nil
+}
+
+func (r *repository) RevokeSession(id string) error {
+	query := `UPDATE sessions SET is_revoked = $1 WHERE id = $2`
+	result, err := r.pool.Exec(context.Background(), query, true, id)
+	if err != nil {
+		return err
+	}
+
+	if result.RowsAffected() == 0 {
+		return domain.ErrSessionNotFound
+	}
+	return err
+}
+
+func (r *repository) DeleteSession(id string) error {
+	query := `DELETE FROM sessions where id = $1`
+	result, err := r.pool.Exec(context.Background(), query, id)
+	if err != nil {
+		return err
+	}
+
+	if result.RowsAffected() == 0 {
+		return domain.ErrSessionNotFound
+	}
+
+	return nil
+}
