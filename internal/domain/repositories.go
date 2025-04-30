@@ -8,7 +8,7 @@ type Repository interface {
 	DeleteProduct(id string) error
 
 	CreateOrder(order *Order) (*Order, error)
-	GetOrderByID(id string) (*Order, error)
+	GetOrder(userID string) (*Order, error)
 	GetOrderItems(orderID string) ([]OrderItem, error)
 	ListOrders() ([]Order, error)
 	DeleteOrder(id string) error

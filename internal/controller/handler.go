@@ -1,21 +1,28 @@
 package controller
 
 import (
+	"ecomm/internal/controller/auth"
 	"ecomm/internal/domain"
 	"ecomm/internal/usecases"
-	"ecomm/pkg"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 type ProductHandler struct {
-	usecase *usecases.UseCase
+	usecase    *usecases.UseCase
+	jwtManager *auth.JWTManager
 }
 
 func NewProductHandler(usecase *usecases.UseCase) *ProductHandler {
+	jwtManager, err := auth.NewTokenGenerator()
+	if err != nil {
+		panic(err)
+	}
+
 	return &ProductHandler{
-		usecase: usecase,
+		usecase:    usecase,
+		jwtManager: jwtManager,
 	}
 }
 
@@ -52,8 +59,8 @@ func (ph *ProductHandler) GetProductByID(ctx *gin.Context) {
 	ctx.JSON(200, product)
 }
 
-func (ph *ProductHandler) GetAllProducts(ctx *gin.Context) {
-	products, err := ph.usecase.GetAllProducts()
+func (ph *ProductHandler) ListProducts(ctx *gin.Context) {
+	products, err := ph.usecase.ListProducts()
 	if err != nil {
 		ctx.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -98,13 +105,24 @@ func (ph *ProductHandler) DeleteProduct(ctx *gin.Context) {
 }
 
 func (ph *ProductHandler) CreateOrder(ctx *gin.Context) {
-	var request domain.CreateOrderRequest
+	claims, err := ph.jwtManager.GetUserClaims(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
+	if claims == nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "claims not found"})
+		return
+	}
+
+	var request domain.CreateOrderRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	request.UserID = claims.ID
 	order, err := ph.usecase.CreateOrder(&request)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -114,9 +132,19 @@ func (ph *ProductHandler) CreateOrder(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, order)
 }
 
-func (ph *ProductHandler) GetOrderByID(ctx *gin.Context) {
-	id := ctx.Param("id")
-	order, err := ph.usecase.GetOrderByID(id)
+func (ph *ProductHandler) GetOrder(ctx *gin.Context) {
+	claims, err := ph.jwtManager.GetUserClaims(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if claims == nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "claims not found"})
+		return
+	}
+
+	order, err := ph.usecase.GetOrder(claims.ID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -130,8 +158,8 @@ func (ph *ProductHandler) GetOrderByID(ctx *gin.Context) {
 	ctx.JSON(200, order)
 }
 
-func (ph *ProductHandler) GetAllOrders(ctx *gin.Context) {
-	orders, err := ph.usecase.GetAllOrders()
+func (ph *ProductHandler) ListOrders(ctx *gin.Context) {
+	orders, err := ph.usecase.ListOrders()
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -179,19 +207,25 @@ func (ph *ProductHandler) ListUsers(ctx *gin.Context) {
 }
 
 func (ph *ProductHandler) UpdateUser(ctx *gin.Context) {
-	var request domain.UpdateUserRequest
+	claims, err := ph.jwtManager.GetUserClaims(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
+	if claims == nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "claims not found"})
+		return
+	}
+
+	var request domain.UpdateUserRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := pkg.ValidateStruct(request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err})
-		return
-	}
-
-	err := ph.usecase.UpdateUser(&request)
+	request.ID = claims.ID
+	err = ph.usecase.UpdateUser(&request)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -201,8 +235,22 @@ func (ph *ProductHandler) UpdateUser(ctx *gin.Context) {
 }
 
 func (ph *ProductHandler) DeleteUser(ctx *gin.Context) {
-	id := ctx.Param("id")
-	err := ph.usecase.DeleteUser(id)
+	claims, err := ph.jwtManager.GetUserClaims(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if claims == nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "claims not found"})
+		return
+	}
+
+	var request domain.DeleteUserRequest
+	request.UserID = claims.ID
+	request.SessionID = claims.RegisteredClaims.ID
+
+	err = ph.usecase.DeleteUser(&request)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -219,24 +267,31 @@ func (ph *ProductHandler) Login(ctx *gin.Context) {
 		return
 	}
 
-	token, err := ph.usecase.Login(&request)
+	loginResponse, err := ph.usecase.Login(&request)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"token": token})
+	ctx.JSON(http.StatusOK, gin.H{"response": loginResponse})
 }
 
 func (ph *ProductHandler) Logout(ctx *gin.Context) {
-	var request domain.LogoutRequest
-
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	claims, err := ph.jwtManager.GetUserClaims(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	err := ph.usecase.Logout(&request)
+	if claims == nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "claims not found"})
+		return
+	}
+
+	var request domain.LogoutRequest
+
+	request.SessionID = claims.RegisteredClaims.ID
+	err = ph.usecase.Logout(&request)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -253,6 +308,18 @@ func (ph *ProductHandler) RefreshAccessToken(ctx *gin.Context) {
 		return
 	}
 
+	claims, err := ph.jwtManager.ValidateToken(request.RefreshToken)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	if claims == nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "claims not found"})
+		return
+	}
+
+	request.SessionID = claims.RegisteredClaims.ID
 	token, err := ph.usecase.RefreshToken(&request)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -263,13 +330,18 @@ func (ph *ProductHandler) RefreshAccessToken(ctx *gin.Context) {
 }
 
 func (ph *ProductHandler) RevokeSession(ctx *gin.Context) {
-	id := ctx.Param("id")
-	if id == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Session ID is required"})
+	claims, err := ph.jwtManager.GetUserClaims(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	err := ph.usecase.RevokeSession(id)
+	if claims == nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "claims not found"})
+		return
+	}
+
+	err = ph.usecase.RevokeSession(claims.RegisteredClaims.ID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

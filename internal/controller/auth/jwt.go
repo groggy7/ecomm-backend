@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 )
 
 type Claims struct {
@@ -29,18 +29,13 @@ func NewTokenGenerator() (*JWTManager, error) {
 	return &JWTManager{key: []byte(key)}, nil
 }
 
-func (t *JWTManager) GenerateToken(email, userID string, isAdmin bool, expiresAt time.Time) (string, *Claims, error) {
-	tokenID, err := uuid.NewUUID()
-	if err != nil {
-		return "", nil, err
-	}
-
+func (t *JWTManager) GenerateToken(email, userID, sessionID string, isAdmin bool, expiresAt time.Time) (string, *Claims, error) {
 	claims := Claims{
 		ID:      userID,
 		Email:   email,
 		IsAdmin: isAdmin,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        tokenID.String(),
+			ID:        sessionID,
 			Issuer:    "ecomm",
 			Subject:   email,
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -73,4 +68,9 @@ func (t *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
 	}
 
 	return nil, fmt.Errorf("invalid token")
+}
+
+func (t *JWTManager) GetUserClaims(ctx *gin.Context) (*Claims, error) {
+	claims := ctx.MustGet("claims").(*Claims)
+	return claims, nil
 }

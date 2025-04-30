@@ -44,16 +44,18 @@ type Order struct {
 	ShippingPrice float64     `json:"shipping_price"`
 	TotalPrice    float64     `json:"total_price"`
 	OrderItems    []OrderItem `json:"order_items"`
+	UserID        string      `json:"user_id"`
 	CreatedAt     uint64      `json:"created_at"`
 	UpdatedAt     uint64      `json:"updated_at"`
 }
 
 type CreateOrderRequest struct {
 	PaymentMethod string      `json:"payment_method" binding:"required"`
-	TaxPrice      float64     `json:"tax_price" binding:"required"`
-	ShippingPrice float64     `json:"shipping_price" binding:"required"`
-	TotalPrice    float64     `json:"total_price" binding:"required"`
-	OrderItems    []OrderItem `json:"order_items" binding:"required"`
+	TaxPrice      float64     `json:"tax_price" binding:"required,gte=0"`
+	ShippingPrice float64     `json:"shipping_price" binding:"required,gte=0"`
+	TotalPrice    float64     `json:"total_price" binding:"required,gte=0"`
+	OrderItems    []OrderItem `json:"order_items" binding:"required,min=1"`
+	UserID        string      `json:"-"`
 }
 
 type OrderItem struct {
@@ -61,9 +63,9 @@ type OrderItem struct {
 	OrderID   string  `json:"order_id"`
 	ProductID string  `json:"product_id" binding:"required"`
 	Name      string  `json:"name"  binding:"required"`
-	Quantity  int     `json:"quantity" binding:"required"`
+	Quantity  int     `json:"quantity" binding:"required,gte=1"`
 	Image     string  `json:"image" binding:"required"`
-	Price     float64 `json:"price" binding:"required"`
+	Price     float64 `json:"price" binding:"required,gte=0"`
 }
 
 type User struct {
@@ -104,9 +106,14 @@ type UserInfo struct {
 type UpdateUserRequest struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
-	Email    string `json:"email" validate:"required"`
+	Email    string `json:"-"`
 	Password string `json:"password"`
 	IsAdmin  bool   `json:"is_admin"`
+}
+
+type DeleteUserRequest struct {
+	UserID    string `json:"-"`
+	SessionID string `json:"-"`
 }
 
 type Session struct {
@@ -124,24 +131,20 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	SessionID             string `json:"session_id"`
-	AccessToken           string `json:"access_token"`
-	RefreshToken          string `json:"refresh_token"`
-	AccessTokenExpiresAt  uint64 `json:"access_token_expires_at"`
-	RefreshTokenExpiresAt uint64 `json:"refresh_token_expires_at"`
+	SessionID    string `json:"session_id"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type LogoutRequest struct {
-	Email     string `json:"email" binding:"required"`
 	SessionID string `json:"session_id" binding:"required"`
 }
 
 type RefreshAccessTokenRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
-	SessionID    string `json:"session_id" binding:"required"`
+	SessionID    string `json:"-"`
 }
 
 type RefreshAccessTokenResponse struct {
-	AccessToken          string `json:"access_token"`
-	AccessTokenExpiresAt uint64 `json:"access_token_expires_at"`
+	AccessToken string `json:"access_token"`
 }

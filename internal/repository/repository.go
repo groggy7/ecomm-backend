@@ -146,8 +146,8 @@ func (r *repository) CreateOrder(order *domain.Order) (*domain.Order, error) {
 	defer tx.Rollback(context.Background())
 
 	query := `
-		INSERT INTO orders(payment_method, tax_price, shipping_price, total_price)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO orders(payment_method, tax_price, shipping_price, total_price, user_id)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id
 	`
 
@@ -155,7 +155,8 @@ func (r *repository) CreateOrder(order *domain.Order) (*domain.Order, error) {
 		&order.PaymentMethod,
 		&order.TaxPrice,
 		&order.ShippingPrice,
-		&order.TotalPrice).Scan(&order.ID)
+		&order.TotalPrice,
+		&order.UserID).Scan(&order.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -186,14 +187,14 @@ func (r *repository) CreateOrder(order *domain.Order) (*domain.Order, error) {
 	return order, nil
 }
 
-func (r *repository) GetOrderByID(id string) (*domain.Order, error) {
+func (r *repository) GetOrder(userID string) (*domain.Order, error) {
 	query := `
 		SELECT id, payment_method, tax_price, shipping_price, total_price, created_at, updated_at
-		FROM orders WHERE id = $1
+		FROM orders WHERE user_id = $1
 	`
 
 	order := new(domain.Order)
-	if err := r.pool.QueryRow(context.Background(), query, id).Scan(
+	if err := r.pool.QueryRow(context.Background(), query, userID).Scan(
 		&order.ID,
 		&order.PaymentMethod,
 		&order.TaxPrice,

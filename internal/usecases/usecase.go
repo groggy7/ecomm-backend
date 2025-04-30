@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -45,7 +46,7 @@ func (u *UseCase) GetProductByID(id string) (*domain.Product, error) {
 	return u.repo.GetProductByID(id)
 }
 
-func (u *UseCase) GetAllProducts() ([]domain.Product, error) {
+func (u *UseCase) ListProducts() ([]domain.Product, error) {
 	return u.repo.ListProducts()
 }
 
@@ -101,13 +102,14 @@ func (u *UseCase) CreateOrder(req *domain.CreateOrderRequest) (*domain.Order, er
 		ShippingPrice: req.ShippingPrice,
 		TotalPrice:    req.TotalPrice,
 		OrderItems:    req.OrderItems,
+		UserID:        req.UserID,
 	}
 
 	return u.repo.CreateOrder(order)
 }
 
-func (u *UseCase) GetOrderByID(id string) (*domain.Order, error) {
-	order, err := u.repo.GetOrderByID(id)
+func (u *UseCase) GetOrder(id string) (*domain.Order, error) {
+	order, err := u.repo.GetOrder(id)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +123,7 @@ func (u *UseCase) GetOrderByID(id string) (*domain.Order, error) {
 	return order, nil
 }
 
-func (u *UseCase) GetAllOrders() ([]domain.Order, error) {
+func (u *UseCase) ListOrders() ([]domain.Order, error) {
 	orders, err := u.repo.ListOrders()
 	if err != nil {
 		return nil, err
@@ -199,9 +201,6 @@ func (u *UseCase) UpdateUser(req *domain.UpdateUserRequest) error {
 	if req.Name != "" {
 		user.Name = req.Name
 	}
-	if req.Email != "" {
-		user.Email = req.Email
-	}
 	if req.Password != "" {
 		user.Password = req.Password
 	}
@@ -213,8 +212,16 @@ func (u *UseCase) UpdateUser(req *domain.UpdateUserRequest) error {
 	return u.repo.UpdateUser(user)
 }
 
-func (u *UseCase) DeleteUser(id string) error {
-	return u.repo.DeleteUser(id)
+func (u *UseCase) DeleteUser(req *domain.DeleteUserRequest) error {
+	if err := u.repo.DeleteSession(req.SessionID); err != nil {
+		return err
+	}
+
+	if err := u.repo.DeleteUser(req.UserID); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (u *UseCase) Login(req *domain.LoginRequest) (*domain.LoginResponse, error) {
@@ -227,12 +234,18 @@ func (u *UseCase) Login(req *domain.LoginRequest) (*domain.LoginResponse, error)
 		return nil, err
 	}
 
-	accessToken, accessClaims, err := u.jwtManager.GenerateToken(user.Email, user.ID, user.IsAdmin, time.Now().Add(3*time.Hour))
+	UUID, err := uuid.NewUUID()
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, refreshClaims, err := u.jwtManager.GenerateToken(user.Email, user.ID, user.IsAdmin, time.Now().Add(3*24*time.Hour))
+	tokenID := UUID.String()
+	accessToken, _, err := u.jwtManager.GenerateToken(user.Email, user.ID, tokenID, user.IsAdmin, time.Now().Add(3*time.Hour))
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, refreshClaims, err := u.jwtManager.GenerateToken(user.Email, user.ID, tokenID, user.IsAdmin, time.Now().Add(3*24*time.Hour))
 	if err != nil {
 		return nil, err
 	}
@@ -248,11 +261,9 @@ func (u *UseCase) Login(req *domain.LoginRequest) (*domain.LoginResponse, error)
 	}
 
 	return &domain.LoginResponse{
-		SessionID:             refreshClaims.RegisteredClaims.ID,
-		AccessToken:           accessToken,
-		RefreshToken:          refreshToken,
-		AccessTokenExpiresAt:  uint64(accessClaims.RegisteredClaims.ExpiresAt.Unix()),
-		RefreshTokenExpiresAt: uint64(refreshClaims.RegisteredClaims.ExpiresAt.Unix()),
+		SessionID:    refreshClaims.RegisteredClaims.ID,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
 	}, nil
 }
 
@@ -263,10 +274,6 @@ func (u *UseCase) Logout(req *domain.LogoutRequest) error {
 	}
 
 	if session.IsRevoked {
-		return fmt.Errorf("invalid session")
-	}
-
-	if session.Email != req.Email {
 		return fmt.Errorf("invalid session")
 	}
 
@@ -304,14 +311,13 @@ func (u *UseCase) RefreshToken(req *domain.RefreshAccessTokenRequest) (*domain.R
 		return nil, err
 	}
 
-	token, claims, err := u.jwtManager.GenerateToken(user.Email, user.ID, user.IsAdmin, time.Now().Add(3*time.Hour))
+	token, _, err := u.jwtManager.GenerateToken(user.Email, user.ID, session.ID, user.IsAdmin, time.Now().Add(3*time.Hour))
 	if err != nil {
 		return nil, err
 	}
 
 	return &domain.RefreshAccessTokenResponse{
-		AccessToken:          token,
-		AccessTokenExpiresAt: uint64(claims.RegisteredClaims.ExpiresAt.Unix()),
+		AccessToken: token,
 	}, nil
 }
 
