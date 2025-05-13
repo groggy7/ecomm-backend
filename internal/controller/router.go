@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewRouter(ph *ProductHandler) *gin.Engine {
+func NewRouter(ph *Handler) *gin.Engine {
 	engine := gin.Default()
 
 	authMiddleware := auth.JWTAuthMiddleware(ph.jwtManager)

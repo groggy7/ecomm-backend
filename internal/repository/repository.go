@@ -64,13 +64,13 @@ func (r *repository) GetProductByID(id string) (*domain.Product, error) {
 	return product, nil
 }
 
-func (r *repository) ListProducts() ([]domain.Product, error) {
+func (r *repository) ListProducts() ([]*domain.Product, error) {
 	query := `
 		SELECT id, name, image, category, description, rating, num_reviews, price, count_in_stock, created_at, updated_at
 		FROM products
 	`
 
-	products := make([]domain.Product, 0)
+	products := make([]*domain.Product, 0)
 	rows, err := r.pool.Query(context.Background(), query)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (r *repository) ListProducts() ([]domain.Product, error) {
 		if err != nil {
 			return nil, err
 		}
-		products = append(products, *product)
+		products = append(products, product)
 	}
 
 	return products, nil
@@ -208,13 +208,13 @@ func (r *repository) GetOrder(userID string) (*domain.Order, error) {
 	return order, nil
 }
 
-func (r *repository) ListOrders() ([]domain.Order, error) {
+func (r *repository) ListOrders() ([]*domain.Order, error) {
 	query := `
 		SELECT id, payment_method, tax_price, shipping_price, total_price, created_at, updated_at
 		FROM orders
 	`
 
-	var orders []domain.Order
+	var orders []*domain.Order
 	if err := pgxscan.Select(context.Background(), r.pool, &orders, query); err != nil {
 		return nil, err
 	}
@@ -225,7 +225,7 @@ func (r *repository) ListOrders() ([]domain.Order, error) {
 			FROM order_items WHERE order_id = $1
 		`
 
-		var orderItems []domain.OrderItem
+		var orderItems []*domain.OrderItem
 		if err := pgxscan.Select(context.Background(), r.pool, &orderItems, query, orders[i].ID); err != nil {
 			return nil, err
 		}
@@ -319,13 +319,13 @@ func (r *repository) GetUser(email string) (*domain.User, error) {
 	return user, nil
 }
 
-func (r *repository) ListUsers() ([]domain.User, error) {
+func (r *repository) ListUsers() ([]*domain.User, error) {
 	query := `
 		SELECT id, name, email, is_admin, created_at, updated_at
 		FROM users
 	`
 
-	var users []domain.User
+	var users []*domain.User
 	if err := pgxscan.Select(context.Background(), r.pool, &users, query); err != nil {
 		return nil, err
 	}

@@ -1,35 +1,33 @@
 package main
 
 import (
-	"context"
 	"ecomm/internal/controller"
-	"ecomm/internal/repository"
-	"ecomm/internal/usecases"
+	"ecomm/proto"
 	"log"
-	"os"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file", err)
+		log.Printf("Warning: Error loading .env file: %v", err)
 	}
 
-	connString := os.Getenv("CONN_STRING")
-	if connString == "" {
-		log.Fatal("CONN_STRING is not set")
+	options := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
 	}
 
-	pool, err := pgxpool.New(context.Background(), connString)
+	conn, err := grpc.NewClient("localhost:8081", options...)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
+	defer conn.Close()
 
-	productRepo := repository.NewRepository(pool)
-	productUsecase := usecases.NewUseCase(productRepo)
-	productHandler := controller.NewProductHandler(productUsecase)
+	client := proto.NewApiServiceClient(conn)
+	productHandler := controller.NewHandler(client)
 
 	router := controller.NewRouter(productHandler)
 	if err := router.Run(":8080"); err != nil {

@@ -1,0 +1,258 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "internal/domain/service";
+
+message Product {
+	string id = 1;
+	string name = 2;
+	string image = 3;
+	string category = 4;
+	string description = 5;
+	int32 rating = 6;
+	int32 number_of_reviews = 7;
+	double price = 8;
+	int32 count_in_stock = 9;
+	uint64 created_at = 10;
+	uint64 updated_at = 11;
+}
+
+message CreateProductRequest {
+	string name = 1;
+	string image = 2;
+	string category = 3;
+	string description = 4;
+	int32 rating = 5;
+	int32 number_of_reviews = 6;
+	double price = 7;
+	int32 count_in_stock = 8;
+}
+
+message CreateProductResponse {
+	Product product = 1;
+}
+
+message UpdateProductRequest {
+	string id = 1;
+	string name = 2;
+	string image = 3;
+	string category = 4;
+	string description = 5;
+	int32 rating = 6;
+	int32 number_of_reviews = 7;
+	double price = 8;
+	int32 count_in_stock = 9;
+}
+
+message UpdateProductResponse {
+}
+
+message DeleteProductRequest {
+	string id = 1;
+}
+
+message DeleteProductResponse {
+	string id = 1;
+}
+
+message GetProductByIDRequest {
+	string id = 1;
+}
+
+message GetProductByIDResponse {
+	Product product = 1;
+}
+
+message ListProductsRequest {
+}
+
+message ListProductsResponse {
+	repeated Product products = 1;
+}
+
+message Order {
+	string id = 1;
+	string payment_method = 2;
+	double tax_price = 3;
+	double shipping_price = 4;
+	double total_price = 5;
+	repeated OrderItem order_items = 6;
+	string user_id = 7;
+	uint64 created_at = 8;
+	uint64 updated_at = 9;
+}
+
+message CreateOrderRequest {
+	string payment_method = 1;
+	double tax_price = 2;
+	double shipping_price = 3;
+	double total_price = 4;
+	repeated OrderItem order_items = 5;
+	string user_id = 6;
+}
+
+message CreateOrderResponse {
+	Order order = 1;
+}
+
+message OrderItem {
+	string id = 1;
+	string order_id = 2;
+	string product_id = 3;
+	string name = 4;
+	int32 quantity = 5;
+	string image = 6;
+	double price = 7;
+}
+
+message GetOrderRequest {
+	string user_id = 1;
+}
+
+message GetOrderResponse {
+	Order order = 1;
+}
+
+message ListOrdersRequest {
+}
+
+message ListOrdersResponse {
+	repeated Order orders = 1;
+}
+
+message DeleteOrderRequest {
+	string id = 1;
+}
+
+message DeleteOrderResponse {
+	string id = 1;
+}
+
+message User {
+	string id = 1;
+	string name = 2;
+	string email = 3;
+	string password = 4;
+	bool is_admin = 5;
+	uint64 created_at = 6;
+	uint64 updated_at = 7;
+}
+
+message CreateUserRequest {
+	string name = 1;
+	string email = 2;
+	string password = 3;
+	bool is_admin = 4;
+}
+
+message CreateUserResponse {
+	string id = 1;
+	string name = 2;
+	string email = 3;
+	bool is_admin = 4;
+}
+
+message ListUserResponse {
+	repeated UserInfo users = 1;
+}
+
+message UserInfo {
+	string id = 1;
+	string name = 2;
+	string email = 3;
+	bool is_admin = 4;
+}
+
+message UpdateUserRequest {
+	string id = 1;
+	string name = 2;
+	string email = 3;
+	string password = 4;
+	bool is_admin = 5;
+}
+
+message UpdateUserResponse {
+	User user = 1;
+}
+
+message DeleteUserRequest {
+	string user_id = 1;
+	string session_id = 2;
+}
+
+message DeleteUserResponse {
+}
+
+message LoginRequest {
+	string email = 1;
+	string password = 2;
+}
+
+message LoginResponse {
+	string session_id = 1;
+	string access_token = 2;
+	string refresh_token = 3;
+}
+
+message LogoutRequest {
+	string session_id = 1;
+}
+
+message LogoutResponse {
+}
+
+message RefreshAccessTokenRequest {
+	string refresh_token = 1;
+	string session_id = 2;
+}
+
+message RefreshAccessTokenResponse {
+	string access_token = 1;
+}
+
+message GetUserRequest {
+	string email = 1;
+}
+
+message GetUserResponse {
+	User user = 1;
+}
+
+message ListUsersRequest {
+}
+
+message ListUsersResponse {
+	repeated User users = 1;
+}
+
+message RevokeSessionRequest {
+	string session_id = 1;
+}
+
+message RevokeSessionResponse {
+}
+
+service ApiService {
+	rpc CreateProduct(CreateProductRequest) returns (CreateProductResponse) {}
+	rpc GetProductByID(GetProductByIDRequest) returns (GetProductByIDResponse) {}
+	rpc ListProducts(ListProductsRequest) returns (ListProductsResponse) {}
+	rpc UpdateProduct(UpdateProductRequest) returns (UpdateProductResponse) {}
+	rpc DeleteProduct(DeleteProductRequest) returns (DeleteProductResponse) {}
+
+    rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse) {}
+	rpc GetOrder(GetOrderRequest) returns (GetOrderResponse) {}
+	rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse) {}
+	rpc DeleteOrder(DeleteOrderRequest) returns (DeleteOrderResponse) {}
+
+    rpc CreateUser(CreateUserRequest) returns (CreateUserResponse) {}
+	rpc GetUser(GetUserRequest) returns (GetUserResponse) {}
+	rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {}
+	rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {}
+	rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {}
+
+	rpc Login(LoginRequest) returns (LoginResponse) {}
+	rpc Logout(LogoutRequest) returns (LogoutResponse) {}
+	rpc RefreshToken(RefreshAccessTokenRequest) returns (RefreshAccessTokenResponse) {}
+	rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse) {}
+}

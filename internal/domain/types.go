@@ -38,15 +38,15 @@ type UpdateProductRequest struct {
 }
 
 type Order struct {
-	ID            string      `json:"id"`
-	PaymentMethod string      `json:"payment_method"`
-	TaxPrice      float64     `json:"tax_price"`
-	ShippingPrice float64     `json:"shipping_price"`
-	TotalPrice    float64     `json:"total_price"`
-	OrderItems    []OrderItem `json:"order_items"`
-	UserID        string      `json:"user_id"`
-	CreatedAt     uint64      `json:"created_at"`
-	UpdatedAt     uint64      `json:"updated_at"`
+	ID            string       `json:"id"`
+	PaymentMethod string       `json:"payment_method"`
+	TaxPrice      float64      `json:"tax_price"`
+	ShippingPrice float64      `json:"shipping_price"`
+	TotalPrice    float64      `json:"total_price"`
+	OrderItems    []*OrderItem `json:"order_items"`
+	UserID        string       `json:"user_id"`
+	CreatedAt     uint64       `json:"created_at"`
+	UpdatedAt     uint64       `json:"updated_at"`
 }
 
 type CreateOrderRequest struct {
